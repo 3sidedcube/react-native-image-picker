@@ -285,8 +285,10 @@ RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options callback:(RCTResponseS
 
         // Create the response object
         self.response = [[NSMutableDictionary alloc] init];
+        self.response[@"mediaType"] = [mediaType isEqualToString:(NSString *)kUTTypeImage] ? @"image" : @"video";
 
         if ([mediaType isEqualToString:(NSString *)kUTTypeImage]) { // PHOTOS
+            
             UIImage *image;
             if ([[self.options objectForKey:@"allowsEditing"] boolValue]) {
                 image = [info objectForKey:UIImagePickerControllerEditedImage];
@@ -294,8 +296,14 @@ RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options callback:(RCTResponseS
             else {
                 image = [info objectForKey:UIImagePickerControllerOriginalImage];
             }
+            
+            CFStringRef UTI = UTTypeCreatePreferredIdentifierForTag(kUTTagClassFilenameExtension, (__bridge CFStringRef)[fileName pathExtension], NULL);
+            CFStringRef MIMEType = UTTypeCopyPreferredTagWithClass(UTI, kUTTagClassMIMEType);
+            CFRelease(UTI);
+            self.response[@"mimeType"] = MIMEType ? (__bridge NSString *)(MIMEType) : @"application/octet-stream";
 
             if (imageURL) {
+                
                 PHAsset *pickedAsset = [PHAsset fetchAssetsWithALAssetURLs:@[imageURL] options:nil].lastObject;
                 NSString *originalFilename = [self originalFilenameForAsset:pickedAsset assetType:PHAssetResourceTypePhoto];
                 self.response[@"fileName"] = originalFilename ?: [NSNull null];
@@ -339,6 +347,14 @@ RCT_EXPORT_METHOD(showImagePicker:(NSDictionary *)options callback:(RCTResponseS
                     if (fileSizeValue){
                         [gifResponse setObject:fileSizeValue forKey:@"fileSize"];
                     }
+                    
+                    NSString *mimeType = (__bridge_transfer NSString*)UTTypeCopyPreferredTagWithClass
+                    ((__bridge CFStringRef)[[asset defaultRepresentation] UTI], kUTTagClassMIMEType);
+                    if (mimeType) {
+                        [gifResponse setObject:mimeType forKey:@"mimeType"];
+                    }
+                    
+                    [gifResponse setObject:@"image" forKey:@"mediaType"];
 
                     self.callback(@[gifResponse]);
                 } failureBlock:^(NSError *error) {
